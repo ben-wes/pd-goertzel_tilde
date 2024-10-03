@@ -2,6 +2,9 @@
 
 This external is a simple implementation of the Goertzel algorithm as described on https://www.mstarlabs.com/dsp/goertzel/goertzel.html
 
+creation argument:
+* `<float>` - detection frequency
+
 1st inlet expects:
 * incoming audio signal
 * `[frequency $1(` message for setting the detection frequency
