@@ -1,4 +1,4 @@
-// based on https://github.com/Harvie/Programs/blob/master/c/goertzel/goertzel.c
+// based on https://www.mstarlabs.com/dsp/goertzel/goertzel.html
 
 #include "m_pd.h"
 #include <math.h>
@@ -9,40 +9,45 @@ typedef struct _goertzel_tilde {
     t_object  x_obj;
     t_sample f_dummy;     // Dummy float for signal inlet
     t_float f_frequency;  // Target frequency
+    t_float f_realW;      // Precomputed real W
+    t_float f_imagW;      // Precomputed imaginary W
     t_outlet *x_real_out; // Real part outlet
     t_outlet *x_imag_out; // Imaginary part outlet
 } t_goertzel_tilde;
+
+static void goertzel_tilde_update_coefficients(t_goertzel_tilde *x, int N)
+{
+    float k = (int)(0.5 + ((float)N * x->f_frequency / sys_getsr()));
+    x->f_realW = 2.0 * cos(2.0 * M_PI * k / N);
+    x->f_imagW = sin(2.0 * M_PI * k / N);
+}
 
 static t_int *goertzel_tilde_perform(t_int *w)
 {
     t_goertzel_tilde *x = (t_goertzel_tilde *)(w[1]);
     t_sample *in = (t_sample *)(w[2]);
-    int n = (int)(w[3]);
+    int N = (int)(w[3]);
     
-    float floatnumSamples = (float)n;
-    float k = (int)(0.5 + ((floatnumSamples * x->f_frequency) / sys_getsr()));
-    float omega = (2.0 * M_PI * k) / floatnumSamples;
-    float sine = sinf(omega);
-    float cosine = cosf(omega);
-    float coeff = 2.0 * cosine;
-    float q0 = 0, q1 = 0, q2 = 0;
+    float d1 = 0.0f, d2 = 0.0f, y;
+    
+    // Update coefficients for current block size
+    goertzel_tilde_update_coefficients(x, N);
     
     // Process the block
-    for(int i = 0; i < n; i++)
+    for(int n = 0; n < N; n++)
     {
-        q0 = coeff * q1 - q2 + in[i];
-        q2 = q1;
-        q1 = q0;
+        y = in[n] + x->f_realW * d1 - d2;
+        d2 = d1;
+        d1 = y;
     }
     
     // Calculate real and imaginary parts
-    float scalingFactor = n / 2.0;
-    float real = (q1 - q2 * cosine) / scalingFactor;
-    float imag = (q2 * sine) / scalingFactor;
+    float resultr = 0.5f * x->f_realW * d1 - d2;
+    float resulti = x->f_imagW * d1;
     
     // Output real and imaginary parts
-    outlet_float(x->x_imag_out, imag);
-    outlet_float(x->x_real_out, real);
+    outlet_float(x->x_imag_out, resulti);
+    outlet_float(x->x_real_out, resultr);
     
     return (w+4);
 }
@@ -54,10 +59,11 @@ static void goertzel_tilde_dsp(t_goertzel_tilde *x, t_signal **sp)
 
 static void goertzel_tilde_frequency(t_goertzel_tilde *x, t_floatarg f)
 {
-    if (f > 0 && f < sys_getsr() / 2) {
+    if (f >= 0 && f < sys_getsr() / 2) {
         x->f_frequency = f;
     } else {
         pd_error(x, "goertzel~: frequency must be positive and below Nyquist");
+        x->f_frequency = 0;
     }
 }
 
@@ -65,7 +71,7 @@ static void *goertzel_tilde_new(t_floatarg f)
 {
     t_goertzel_tilde *x = (t_goertzel_tilde *)pd_new(goertzel_tilde_class);
     
-    x->f_frequency = (f > 0 && f < sys_getsr() / 2) ? f : 440;
+    goertzel_tilde_frequency(x, f);
     
     x->x_real_out = outlet_new(&x->x_obj, &s_float);
     x->x_imag_out = outlet_new(&x->x_obj, &s_float);
