@@ -1,6 +1,6 @@
 # goertzel~ external for Pd (Pure Data)
 
-This external is a simple implementation of the Goertzel algorithm as described on https://www.mstarlabs.com/dsp/goertzel/goertzel.html
+This external (and the vanilla abstraction in the repo) is a simple implementation of the Goertzel algorithm as described on https://www.mstarlabs.com/dsp/goertzel/goertzel.html
 
 creation argument:
 * `<float>` - detection frequency
