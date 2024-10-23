@@ -9,20 +9,20 @@ static t_class *goertzel_tilde_class;
 typedef struct _goertzel_tilde {
     t_object  x_obj;
     t_sample f_dummy;     // Dummy float for signal inlet
-    t_float f_frequency;  // Target frequency
-    t_float f_realW;      // Precomputed real W
-    t_float f_imagW;      // Precomputed imaginary W
-    t_float f_sr;         // Stored sample rate
-    t_int f_blocksize;    // Stored block size
+    t_float frequency;    // Target frequency
+    t_float realW;        // Precomputed real W
+    t_float imagW;        // Precomputed imaginary W
+    t_float samplerate;   // Stored sample rate
+    t_int blocksize;      // Stored block size
     t_outlet *x_real_out; // Real part outlet
     t_outlet *x_imag_out; // Imaginary part outlet
 } t_goertzel_tilde;
 
 static void goertzel_tilde_update_coefficients(t_goertzel_tilde *x)
 {
-    float k = (int)(0.5 + ((float)x->f_blocksize * x->f_frequency / x->f_sr));
-    x->f_realW = 2.0 * cos(2.0 * M_PI * k / x->f_blocksize);
-    x->f_imagW = sin(2.0 * M_PI * k / x->f_blocksize);
+    float k = (int)(0.5 + (float)x->blocksize * x->frequency / x->samplerate);
+    x->realW = 2.0 * cos(2.0 * M_PI * k / x->blocksize);
+    x->imagW = sin(2.0 * M_PI * k / x->blocksize);
 }
 
 static t_int *goertzel_tilde_perform(t_int *w)
@@ -33,16 +33,16 @@ static t_int *goertzel_tilde_perform(t_int *w)
     float d1 = 0.0f, d2 = 0.0f, y;
     
     // Process the block using pre-calculated coefficients
-    for(int n = 0; n < x->f_blocksize; n++)
+    for(int n = 0; n < x->blocksize; n++)
     {
-        y = in[n] + x->f_realW * d1 - d2;
+        y = in[n] + x->realW * d1 - d2;
         d2 = d1;
         d1 = y;
     }
     
     // Calculate real and imaginary parts
-    float resultr = 0.5f * x->f_realW * d1 - d2;
-    float resulti = x->f_imagW * d1;
+    float resultr = 0.5f * x->realW * d1 - d2;
+    float resulti = x->imagW * d1;
     
     // Output real and imaginary parts
     outlet_float(x->x_imag_out, resulti);
@@ -54,8 +54,8 @@ static t_int *goertzel_tilde_perform(t_int *w)
 static void goertzel_tilde_dsp(t_goertzel_tilde *x, t_signal **sp)
 {
     // Store sample rate and block size
-    x->f_sr = sys_getsr();
-    x->f_blocksize = sp[0]->s_n;
+    x->samplerate = sys_getsr();
+    x->blocksize = sp[0]->s_n;
     
     goertzel_tilde_update_coefficients(x);
     
@@ -64,12 +64,12 @@ static void goertzel_tilde_dsp(t_goertzel_tilde *x, t_signal **sp)
 
 static void goertzel_tilde_frequency(t_goertzel_tilde *x, t_floatarg f)
 {
-    if (f >= 0 && f < x->f_sr / 2) {
-        x->f_frequency = f;
+    if (f >= 0 && f < x->samplerate / 2) {
+        x->frequency = f;
         goertzel_tilde_update_coefficients(x);
     } else {
         pd_error(x, "goertzel~: frequency must be positive and below Nyquist");
-        x->f_frequency = 0;
+        x->frequency = 0;
         goertzel_tilde_update_coefficients(x);
     }
 }
@@ -79,8 +79,8 @@ static void *goertzel_tilde_new(t_floatarg f)
     t_goertzel_tilde *x = (t_goertzel_tilde *)pd_new(goertzel_tilde_class);
     
     // Initialize sample rate and block size
-    x->f_sr = sys_getsr();
-    x->f_blocksize = sys_getblksize();
+    x->samplerate = sys_getsr();
+    x->blocksize = sys_getblksize();
     
     // Set initial frequency and calculate coefficients
     goertzel_tilde_frequency(x, f);
