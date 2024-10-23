@@ -12,8 +12,8 @@ typedef struct _goertzel_tilde {
     t_float f_frequency;  // Target frequency
     t_float f_realW;      // Precomputed real W
     t_float f_imagW;      // Precomputed imaginary W
-    t_float f_sr;        // Stored sample rate
-    t_int f_blocksize;   // Stored block size
+    t_float f_sr;         // Stored sample rate
+    t_int f_blocksize;    // Stored block size
     t_outlet *x_real_out; // Real part outlet
     t_outlet *x_imag_out; // Imaginary part outlet
 } t_goertzel_tilde;
